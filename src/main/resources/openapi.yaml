@@ -1,0 +1,306 @@
+openapi: 3.0.0
+
+info:
+  description: Pricing Process API 
+  version: v1
+  title: Pricing Process API (PoC)
+
+
+servers:
+  -
+    url: 'http://{servername}:{port}/{basePath}'
+    description: 'DEV Server'
+    variables:
+      servername:
+        default: 'localhost'
+        description: 'hostname'
+      port:
+        enum:
+          - '7000'
+          - '7001'
+        default: '7000'
+      basePath: 
+        default: 'api/pricing'
+
+
+tags:
+  - name: Get all available offers
+    description: 'Retrieve all currently available offers'
+  - name: Accept or reject an offer
+    description: 'A customer may accept or reject an offer that has been updated for inflation'
+  - name: Amend an offer
+    description: 'Make a new offer to a customer by amending an existing offer'
+  - name: Offer cancellation
+    description: 'Cancel a rejected offer'
+  - name: Create an offer
+    description: 'Create a new customer offer'
+  - name: Simulate inflationary impact
+    description: 'Simulate the impact of inflation on a price offer'
+  - name: Retrieve an offer by id
+    description: 'Retrieve an existing offer by offer ID'
+
+paths:
+  /offers:
+    get:
+      tags:
+        - Get all available offers
+      responses:
+        '200':
+          description: A collection of charging stations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offers'
+        default:
+          description: Unauthorised Access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+    post:
+      tags:
+        - Create an offer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOffer'
+      responses:
+        '200':
+          description: Offer successfully created
+        default:
+          description: Error reponse message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+
+  /offers/{id}:
+    get:
+      tags:
+        - Retrieve an offer by id
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        default:
+          description: Unauthorised Access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+    delete:
+      tags:
+        - Offer cancellation
+      responses:
+        '204':
+          description: 'Offer successfully deleted'
+        default:
+          description: Unauthorised Access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+
+
+
+  /offers/review:
+    put:
+      tags:
+        - Amend an offer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Offer'
+      responses:
+        '201':
+          description: ''
+          headers:
+            Location:
+              description: 'link to amended offer'
+              required: true
+              schema:
+                type: string
+        default:
+          description: Unauthorised Access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+
+  /offers/offerId/{id}/decision/{customerDecision}:
+    put:
+      tags:
+        - Accept or reject an offer
+      responses:
+        '201':
+          description: ''
+          headers:
+            Location:
+              description: 'link to current offer status'
+              required: true
+              schema:
+                type: string
+        default:
+          description: Unauthorised Access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: customerDecision
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+            - OFFER_ACCEPTED_BY_CUSTOMER
+            - OFFER_REJECTED_BY_CUSTOMER
+
+
+  /offers/evaluation/offerPrice/{offerPrice}/offerDate/{offerDate}/percentage/{percentage}:
+    get:
+      tags:
+        - Simulate inflationary impact
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InflationEstimation'
+        default:
+          description: 'Unauthorised Access'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageResponse'
+      parameters:
+        - name: offerPrice
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offerDate
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: percentage
+          in: path
+          required: true
+          schema:
+            type: string
+
+
+components:
+  schemas:
+    AmountType:
+      type: object
+      properties:
+        amount:
+          format: double
+          type: number
+        curr:
+          type: string
+          minLength: 3
+          maxLength: 3
+    NewOffer:
+      type: object
+      properties:
+        amount:
+          $ref: '#/components/schemas/AmountType'
+        offerDate:
+          type: string
+          format: date
+          example: '2019-05-07'
+          pattern: '^([0-9]{4})(-?)(1[0-2]|0[1-9])\2(3[01]|0[1-9]|[12][0-9])'
+        offerStatus:
+          enum:
+            - OFFER_OPEN
+            - OFFER_ACCEPTED_BY_CUSTOMER
+            - OFFER_REJECTED_BY_CUSTOMER
+            - OFFER_AMENDED_BY_SELLER
+            - OFFER_CANCELLED_BY_SELLER
+          type: string
+      required:
+        - offerDate
+        - offerStatus
+        - amount
+    Offer:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          $ref: '#/components/schemas/AmountType'
+        offerDate:
+          type: string
+          format: date
+          example: '2019-05-07'
+          pattern: '^([0-9]{4})(-?)(1[0-2]|0[1-9])\2(3[01]|0[1-9]|[12][0-9])'
+        offerStatus:
+          enum:
+            - OFFER_OPEN
+            - OFFER_ACCEPTED_BY_CUSTOMER
+            - OFFER_REJECTED_BY_CUSTOMER
+            - OFFER_AMENDED_BY_SELLER
+            - OFFER_CANCELLED_BY_SELLER
+          type: string
+      required:
+        - id
+        - offerDate
+        - offerStatus
+        - amount
+    Offers:
+      type: array
+      minItems: 1
+      maxItems: 100
+      items:
+        $ref: '#/components/schemas/Offer'
+
+    InflationEstimation:
+      type: object
+      properties:
+        additionalCost:
+          $ref: '#/components/schemas/AmountType'
+
+
+    ErrorMessageResponse:
+      description: Error response message
+      type: object
+      properties:
+        code:
+          minLength: 1
+          type: string
+        traceId:
+          minLength: 1
+          type: string
+        description:
+          minLength: 1
+          type: string
+      required:
+        - traceId
+        - description
+
